@@ -462,7 +462,7 @@ jobs:
           python checkout.py ${{ inputs.version || 'master' }}
 
       - name: "Fetch artifacts from previous stage"
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4
         with:
           name: windows-artifacts
           path: ./jellyfin-server-windows
@@ -531,7 +531,7 @@ jobs:
           echo "JELLYFIN_RELEASE_TYPE=${{ needs.Windows.outputs.JELLYFIN_RELEASE_TYPE }}" >> $GITHUB_ENV
 
       - name: "Fetch artifact from previous stage"
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4
         with:
           name: windows-installer-artifacts
 
