@@ -37,7 +37,7 @@ jobs:
           sudo apt-get install --yes python3-git python3-yaml
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Prepare repository"
         run: |-
@@ -79,7 +79,7 @@ jobs:
           sudo apt-get install --yes python3-git python3-yaml debsigs devscripts
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Prepare repository"
         run: |-
@@ -156,7 +156,7 @@ jobs:
           sudo apt-get install --yes python3-git python3-yaml debsigs devscripts
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Prepare repository"
         run: |-
@@ -231,7 +231,7 @@ jobs:
           sudo apt-get install --yes python3-git python3-yaml
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Prepare repository"
         run: |-
@@ -295,7 +295,7 @@ jobs:
           sudo apt-get install --yes python3-git python3-yaml
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Prepare repository"
         run: |-
@@ -360,7 +360,7 @@ jobs:
           echo "JELLYFIN_VERSION=$cleanVersion" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Install dependencies"
         run: |-
@@ -382,7 +382,7 @@ jobs:
           path: ./jellyfin-server-windows
 
       - name: "Clone UX repository"
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           repository: jellyfin/jellyfin-ux
           path: .\jellyfin-server-windows\jellyfin-ux
@@ -493,7 +493,7 @@ jobs:
           sudo apt-get install --yes python3-git python3-yaml
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Prepare repository"
         run: |-
@@ -545,7 +545,7 @@ jobs:
           sudo apt-get install --yes python3-git python3-yaml
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Prepare repository"
         run: |-
@@ -601,7 +601,7 @@ jobs:
           dotnet-version: ${{ env.SDK_VERSION }}
 
       - name: "Checkout repository"
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: "Prepare repository"
         run: |-
