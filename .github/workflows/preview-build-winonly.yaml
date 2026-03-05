@@ -70,7 +70,7 @@ jobs:
           target: "/srv/incoming/server/${{ env.JELLYFIN_VERSION }}/windows/${{ matrix.arch }}"
 
       - name: "Move artifacts into repository"
-        uses: appleboy/ssh-action@91f3272fc5907f4699dcf59761eb622a07342f5a # v1.2.3
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: "${{ secrets.REPO_HOST }}"
           username: "${{ secrets.REPO_USER }}"
@@ -213,7 +213,7 @@ jobs:
           target: "/srv/incoming/server/${{ env.JELLYFIN_VERSION }}/windows/${{ matrix.arch }}"
 
       - name: "Move artifacts into repository"
-        uses: appleboy/ssh-action@91f3272fc5907f4699dcf59761eb622a07342f5a # v1.2.3
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: "${{ secrets.REPO_HOST }}"
           username: "${{ secrets.REPO_USER }}"
