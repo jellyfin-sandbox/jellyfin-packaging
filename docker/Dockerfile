@@ -1,9 +1,12 @@
 # Docker build arguments
 ARG DOTNET_VERSION=8.0
 ARG NODEJS_VERSION=20
+ARG LIBICU_VERSION=76
 
 # Combined image version (Debian)
+ARG OS_NAME=debian
 ARG OS_VERSION=trixie
+ARG OS_IMAGE_VERSION=${OS_VERSION}-slim
 
 # Jellyfin FFMPEG package
 ARG FFMPEG_PACKAGE=jellyfin-ffmpeg7
@@ -29,6 +32,7 @@ ARG PACKAGE_ARCH
 ARG DOTNET_ARCH
 # Base Image architecture (amd64, arm64v8, arm32v7), set by build script
 ARG IMAGE_ARCH
+ARG COMBINED_IMAGE_NAME=${IMAGE_ARCH}/${OS_NAME}
 # Target platform architecture (amd64, arm64/v8, arm/v7), set by build script
 ARG TARGET_ARCH
 
@@ -72,7 +76,9 @@ RUN npm ci --no-audit --unsafe-perm \
 #
 # Build the server artifacts
 #
-FROM debian:${OS_VERSION}-slim AS server
+FROM ${OS_NAME}:${OS_IMAGE_VERSION} AS server
+
+ARG LIBICU_VERSION
 
 ARG DOTNET_ARCH
 ARG DOTNET_VERSION
@@ -91,7 +97,7 @@ RUN apt-get update \
  && apt-get install --no-install-recommends --no-install-suggests --yes \
     curl \
     ca-certificates \
-    libicu76 \
+    libicu${LIBICU_VERSION} \
  && curl -fsSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel ${DOTNET_VERSION} --install-dir /usr/local/bin
 
 RUN dotnet publish Jellyfin.Server --arch ${DOTNET_ARCH} --configuration ${CONFIG} \
@@ -101,9 +107,10 @@ RUN dotnet publish Jellyfin.Server --arch ${DOTNET_ARCH} --configuration ${CONFI
 #
 # Build the final combined image
 #
-FROM --platform=linux/${TARGET_ARCH} ${IMAGE_ARCH}/debian:${OS_VERSION}-slim AS combined
+FROM --platform=linux/${TARGET_ARCH} ${COMBINED_IMAGE_NAME}:${OS_IMAGE_VERSION} AS combined
 
 ARG OS_VERSION
+ARG LIBICU_VERSION
 ARG FFMPEG_PACKAGE
 
 ARG GMMLIB_VER
@@ -118,6 +125,8 @@ ARG MALI_PKG_TAG
 ARG MALI_PKG_CFG
 
 ARG PACKAGE_ARCH
+
+ARG DEBS_DIR=debs
 
 # Set the health URL
 ENV HEALTHCHECK_URL=http://localhost:8096/health
@@ -150,6 +159,8 @@ RUN apt-get update \
     ca-certificates \
     gnupg \
     curl \
+ && [[ "${FFMPEG_PACKAGE}" != "./"* ]] || exit 0 \
+ && mkdir -p /etc/apt/keyrings/ \
  && curl -fsSL https://repo.jellyfin.org/jellyfin_team.gpg.key \
   | gpg --dearmor -o /etc/apt/keyrings/jellyfin.gpg \
  && cat <<EOF > /etc/apt/sources.list.d/jellyfin.sources
@@ -161,12 +172,14 @@ Architectures: ${PACKAGE_ARCH}
 Signed-By: /etc/apt/keyrings/jellyfin.gpg
 EOF
 
+COPY ${DEBS_DIR} debs/
+
 RUN apt-get update \
  && apt-get install --no-install-recommends --no-install-suggests --yes \
     ${FFMPEG_PACKAGE} \
     openssl \
     locales \
-    libicu76 \
+    libicu${LIBICU_VERSION} \
     libfontconfig1 \
     libfreetype6 \
     libjemalloc2 \
@@ -175,6 +188,8 @@ RUN apt-get update \
  && apt-get clean autoclean --yes \
  && apt-get autoremove --yes \
  && rm -rf /var/cache/apt/archives* /var/lib/apt/lists/*
+
+RUN rm -rf debs/
 
 # Intel OpenCL Tone mapping dependencies:
 RUN if test "${PACKAGE_ARCH}" = "amd64"; then \
@@ -196,7 +211,7 @@ RUN if test "${PACKAGE_ARCH}" = "amd64"; then \
  && rm -rf /var/cache/apt/archives* /var/lib/apt/lists/*
 
 # Rockchip RK3588 libmali OpenCL dependencies:
-RUN if test "${PACKAGE_ARCH}" = "arm64"; then \
+RUN if test "${PLATFORM}" = "arm64"; then \
     mkdir libmali-rockchip \
  && cd libmali-rockchip \
  && curl -LO https://github.com/tsukumijima/libmali-rockchip/releases/download/${MALI_PKG_TAG}/libmali-${MALI_PKG_CFG}_${MALI_PKG_VER}.deb \

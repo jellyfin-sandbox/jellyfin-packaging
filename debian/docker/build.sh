@@ -13,6 +13,7 @@ if [[ ${ARCH} != $( dpkg --print-architecture ) ]]; then
     export CONFIG_SITE=/etc/dpkg-cross/cross-config.${ARCH}
     export CONFIG_CROSS="-a ${ARCH}"
 fi
+export VERSION=$(echo $VERSION | sed 's/^r//')
 dpkg-buildpackage -us -uc ${CONFIG_CROSS} --pre-clean --post-clean
 
 mkdir -p "${ARTIFACT_DIR}/"

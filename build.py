@@ -15,6 +15,7 @@ from packaging.version import Version
 from subprocess import run, PIPE
 import sys
 from yaml import load, SafeLoader
+import platform
 
 # Determine top level directory of this repository ("jellyfin-packaging")
 revparse = run(["git", "rev-parse", "--show-toplevel"], stdout=PIPE)
@@ -140,7 +141,7 @@ def build_package_deb(
         fh.write(changelog)
 
     # Use a unique docker image name for consistency
-    imagename = f"{configurations[build_type]['imagename']}-{jellyfin_version}_{build_arch}-{build_type}-{build_version}"
+    imagename = f"{configurations[build_type]['imagename']}-{jellyfin_version}_{build_arch}-{build_type.replace('/','_')}-{build_version}"
 
     # Prepare the list of build-args
     build_args = list()
@@ -438,6 +439,12 @@ def build_docker(
     # Set today's date in a convenient format for use as an image suffix
     date = datetime.now().strftime("%Y%m%d-%H%M%S")
 
+    machine = platform.machine()
+    if machine == "aarch64":
+        host_arch = "arm64"
+    elif machine == "x86_64":
+        host_arch = "amd64"
+
     images_hub = list()
     images_ghcr = list()
     for _build_arch in architectures:
@@ -449,6 +456,25 @@ def build_docker(
         DOTNET_ARCH = configurations["docker"]["archmaps"][_build_arch]["DOTNET_ARCH"]
         IMAGE_ARCH = configurations["docker"]["archmaps"][_build_arch]["IMAGE_ARCH"]
         TARGET_ARCH = configurations["docker"]["archmaps"][_build_arch]["TARGET_ARCH"]
+        PLATFORM = configurations["docker"]["archmaps"][_build_arch]["PLATFORM"]
+        FFMPEG_PACKAGE = None
+        if "FFMPEG_PACKAGE" in configurations["docker"]["archmaps"][_build_arch]:
+            FFMPEG_PACKAGE = configurations["docker"]["archmaps"][_build_arch]["FFMPEG_PACKAGE"]
+        OS_NAME = None
+        if "OS_NAME" in configurations["docker"]["archmaps"][_build_arch]:
+            OS_NAME = configurations["docker"]["archmaps"][_build_arch]["OS_NAME"]
+        OS_VERSION = None
+        if "OS_VERSION" in configurations["docker"]["archmaps"][_build_arch]:
+            OS_VERSION = configurations["docker"]["archmaps"][_build_arch]["OS_VERSION"]
+        OS_IMAGE_VERSION = None
+        if "OS_IMAGE_VERSION" in configurations["docker"]["archmaps"][_build_arch]:
+            OS_IMAGE_VERSION = configurations["docker"]["archmaps"][_build_arch]["OS_IMAGE_VERSION"]
+        COMBINED_IMAGE_NAME = None
+        if "COMBINED_IMAGE_NAME" in configurations["docker"]["archmaps"][_build_arch]:
+            COMBINED_IMAGE_NAME = configurations["docker"]["archmaps"][_build_arch]["COMBINED_IMAGE_NAME"]
+        LIBICU_VERSION = None
+        if "LIBICU_VERSION" in configurations["docker"]["archmaps"][_build_arch]:
+            LIBICU_VERSION = configurations["docker"]["archmaps"][_build_arch]["LIBICU_VERSION"]
 
         # Use a unique docker image name for consistency
         if is_stable or is_preview:
@@ -456,14 +482,15 @@ def build_docker(
         else:
             imagename = f"{configurations['docker']['imagename']}:{jellyfin_version}-{_build_arch}"
 
-        # Clean up any existing qemu static image
-        log(
-            f">>> {docker_run_cmd} --privileged linuxserver/qemu-static --reset -p yes"
-        )
-        os.system(
-            f"{docker_run_cmd} --privileged linuxserver/qemu-static --reset -p yes"
-        )
-        log("")
+        if not host_arch or host_arch != PACKAGE_ARCH:
+            # Clean up any existing qemu static image
+            log(
+                f">>> {docker_run_cmd} --privileged linuxserver/qemu-static --reset -p yes"
+            )
+            os.system(
+                f"{docker_run_cmd} --privileged linuxserver/qemu-static --reset -p yes"
+            )
+            log("")
 
         # Prepare the list of build-args
         build_args = list()
@@ -473,6 +500,19 @@ def build_docker(
         build_args.append(f"--build-arg TARGET_ARCH={TARGET_ARCH}")
         build_args.append(f"--build-arg JELLYFIN_VERSION={jellyfin_version}")
         build_args.append(f"--build-arg CONFIG={'Debug' if debug else 'Release'}")
+        build_args.append(f"--build-arg PLATFORM={PLATFORM}")
+        if FFMPEG_PACKAGE:
+            build_args.append(f"--build-arg FFMPEG_PACKAGE={FFMPEG_PACKAGE}")
+        if OS_NAME:
+            build_args.append(f"--build-arg OS_NAME={OS_NAME}")
+        if OS_VERSION:
+            build_args.append(f"--build-arg OS_VERSION={OS_VERSION}")
+        if OS_IMAGE_VERSION:
+            build_args.append(f"--build-arg OS_IMAGE_VERSION={OS_IMAGE_VERSION}")
+        if COMBINED_IMAGE_NAME:
+            build_args.append(f"--build-arg COMBINED_IMAGE_NAME={COMBINED_IMAGE_NAME}")
+        if LIBICU_VERSION:
+            build_args.append(f"--build-arg LIBICU_VERSION={LIBICU_VERSION}")
 
         # Determine framework versions
         framework_versions = _determine_framework_versions()

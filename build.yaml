@@ -64,6 +64,19 @@ ubuntu:
   build_function: build_package_deb
   dockerfile: debian/docker/Dockerfile
   imagename: jellyfin-builder-ubuntu
+nvcr.io/nvidia/l4t-jetpack:
+  releases:
+    r35.3.1: r35.3.1
+  archmaps:
+    arm64:
+      PACKAGE_ARCH: arm64
+      GCC_ARCH: aarch64
+  cross-gcc:
+    r35.3.1: '10'
+  build_function: build_package_deb
+  dockerfile: debian/docker/Dockerfile
+  imagename: jellyfin-builder-jetpack
+    
 
 # Portable archives
 linux:
@@ -123,11 +136,25 @@ docker:
       IMAGE_ARCH: amd64
       PACKAGE_ARCH: amd64
       TARGET_ARCH: amd64
+      PLATFORM: amd64
     arm64:
       DOTNET_ARCH: arm64
       IMAGE_ARCH: arm64v8
       PACKAGE_ARCH: arm64
       TARGET_ARCH: arm64/v8
+      PLATFORM: arm64
+    jetson:
+      DOTNET_ARCH: arm64
+      IMAGE_ARCH: arm64v8
+      PACKAGE_ARCH: arm64
+      TARGET_ARCH: arm64/v8
+      FFMPEG_PACKAGE: ./debs/jellyfin-ffmpeg7*.deb
+      OS_NAME: nvcr.io/nvidia/l4t-jetpack
+      OS_VERSION: r35.3.1
+      OS_IMAGE_VERSION: r35.3.1
+      COMBINED_IMAGE_NAME: nvcr.io/nvidia/l4t-jetpack
+      LIBICU_VERSION: 66
+      PLATFORM: jetson
   dockerfile: docker/Dockerfile
   imagename: jellyfin/jellyfin
 

@@ -4,6 +4,9 @@ TERM := xterm
 SHELL := /bin/bash
 
 HOST_ARCH := $(shell arch)
+ifeq ($(HOST_ARCH),aarch64)
+    HOST_ARCH := arm64
+endif
 BUILD_ARCH := ${DEB_HOST_MULTIARCH}
 ifeq ($(HOST_ARCH),x86_64)
     # Building AMD64
