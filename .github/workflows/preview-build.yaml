@@ -22,9 +22,15 @@ permissions:
 jobs:
   Docker:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+          - arm64
     continue-on-error: false  # true in prod, false for testing
     steps:
-      - name: "Set dated version for unstable builds"
+      - name: "Set version"
         id: version
         run: |-
           echo "JELLYFIN_VERSION=${{ inputs.version }}-rc${{ inputs.preview_id }}" >> $GITHUB_ENV
@@ -43,14 +49,74 @@ jobs:
         run: |-
           ./checkout.py ${{ inputs.version }}-rc${{ inputs.preview_id }}
 
-      - name: "Run builder for Docker containers"
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      - name: "Run builder for Docker ${{ matrix.arch }}"
         run: |-
-          sudo --preserve-env ./build.py ${{ env.JELLYFIN_VERSION }} docker ${{ env.DEBUG_FLAG }}
+          sudo ./build.py ${{ env.JELLYFIN_VERSION }} docker ${{ matrix.arch }} ${{ env.DEBUG_FLAG }}
+
+      - name: "Push Docker image to registries"
+        run: |-
+          VERSION="${{ env.JELLYFIN_VERSION }}"
+          CLEAN_VERSION="${VERSION#v}"
+          IMAGE="jellyfin/jellyfin:${CLEAN_VERSION}-${{ matrix.arch }}"
+          GHCR_IMAGE="ghcr.io/jellyfin/jellyfin:${CLEAN_VERSION}-${{ matrix.arch }}"
+          docker image tag ${IMAGE} ${GHCR_IMAGE}
+          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_TOKEN }} 2>&1
+          docker push ${IMAGE}
+          docker logout
+          docker login -u ${{ secrets.GHCR_USERNAME }} -p ${{ secrets.GHCR_TOKEN }} ghcr.io 2>&1
+          docker push ${GHCR_IMAGE}
+          docker logout ghcr.io
+
+  DockerManifest:
+    needs:
+      - Docker
+    runs-on: ubuntu-24.04
+    continue-on-error: false  # true in prod, false for testing
+    steps:
+      - name: "Set version"
+        id: version
+        run: |-
+          echo "JELLYFIN_VERSION=${{ inputs.version }}-rc${{ inputs.preview_id }}" >> $GITHUB_ENV
+
+      - name: "Log in to Docker Hub"
+        run: |-
+          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_TOKEN }} 2>&1
+
+      - name: "Log in to GHCR"
+        run: |-
+          docker login -u ${{ secrets.GHCR_USERNAME }} -p ${{ secrets.GHCR_TOKEN }} ghcr.io 2>&1
+
+      - name: "Create and push manifests"
+        run: |-
+          VERSION="${{ env.JELLYFIN_VERSION }}"
+          CLEAN_VERSION="${VERSION#v}"
+          DATE=$(date +'%Y%m%d-%H%M%S')
+          HUB="jellyfin/jellyfin"
+          GHCR="ghcr.io/jellyfin/jellyfin"
+          HUB_SOURCES="${HUB}:${CLEAN_VERSION}-amd64 ${HUB}:${CLEAN_VERSION}-arm64"
+          GHCR_SOURCES="${GHCR}:${CLEAN_VERSION}-amd64 ${GHCR}:${CLEAN_VERSION}-arm64"
+
+          # Dated X.Y.Z-rcN manifest
+          docker manifest create ${HUB}:${CLEAN_VERSION}.${DATE} ${HUB_SOURCES}
+          docker manifest push --purge ${HUB}:${CLEAN_VERSION}.${DATE}
+          docker manifest create ${GHCR}:${CLEAN_VERSION}.${DATE} ${GHCR_SOURCES}
+          docker manifest push --purge ${GHCR}:${CLEAN_VERSION}.${DATE}
+          # X.Y.Z-rcN manifest
+          docker manifest create ${HUB}:${CLEAN_VERSION} ${HUB_SOURCES}
+          docker manifest push --purge ${HUB}:${CLEAN_VERSION}
+          docker manifest create ${GHCR}:${CLEAN_VERSION} ${GHCR_SOURCES}
+          docker manifest push --purge ${GHCR}:${CLEAN_VERSION}
+          # preview manifest
+          docker manifest create ${HUB}:preview ${HUB_SOURCES}
+          docker manifest push --purge ${HUB}:preview
+          docker manifest create ${GHCR}:preview ${GHCR_SOURCES}
+          docker manifest push --purge ${GHCR}:preview
+
+      - name: "Log out of registries"
+        if: always()
+        run: |-
+          docker logout
+          docker logout ghcr.io
 
   Debian:
     runs-on: ubuntu-24.04

@@ -16,12 +16,21 @@ permissions:
 jobs:
   Docker:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+          - arm64
+    outputs:
+      JELLYFIN_VERSION: ${{ steps.version.outputs.JELLYFIN_VERSION }}
     continue-on-error: false  # true in prod, false for testing
     steps:
       - name: "Set dated version for unstable builds"
         id: version
         run: |-
           echo "JELLYFIN_VERSION=$(date +'%Y%m%d%H')" >> $GITHUB_ENV
+          echo "JELLYFIN_VERSION=$(date +'%Y%m%d%H')" >> $GITHUB_OUTPUT
           echo "JELLYFIN_RELEASE_TYPE=unstable" >> $GITHUB_ENV
           echo "DEBUG_FLAG=--debug" >>$GITHUB_ENV
 
@@ -37,14 +46,66 @@ jobs:
         run: |-
           ./checkout.py master
 
-      - name: "Run builder for Docker containers"
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      - name: "Run builder for Docker ${{ matrix.arch }}"
         run: |-
-          sudo --preserve-env ./build.py ${{ env.JELLYFIN_VERSION }} docker ${{ env.DEBUG_FLAG }}
+          sudo ./build.py ${{ env.JELLYFIN_VERSION }} docker ${{ matrix.arch }} ${{ env.DEBUG_FLAG }}
+
+      - name: "Push Docker image to registries"
+        run: |-
+          CLEAN_VERSION="${{ env.JELLYFIN_VERSION }}"
+          IMAGE="jellyfin/jellyfin:${CLEAN_VERSION}-${{ matrix.arch }}"
+          GHCR_IMAGE="ghcr.io/jellyfin/jellyfin:${CLEAN_VERSION}-${{ matrix.arch }}"
+          docker image tag ${IMAGE} ${GHCR_IMAGE}
+          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_TOKEN }} 2>&1
+          docker push ${IMAGE}
+          docker logout
+          docker login -u ${{ secrets.GHCR_USERNAME }} -p ${{ secrets.GHCR_TOKEN }} ghcr.io 2>&1
+          docker push ${GHCR_IMAGE}
+          docker logout ghcr.io
+
+  DockerManifest:
+    needs:
+      - Docker
+    runs-on: ubuntu-24.04
+    continue-on-error: false  # true in prod, false for testing
+    steps:
+      - name: "Set version from previous job"
+        id: version
+        run: |-
+          echo "JELLYFIN_VERSION=${{ needs.Docker.outputs.JELLYFIN_VERSION }}" >> $GITHUB_ENV
+
+      - name: "Log in to Docker Hub"
+        run: |-
+          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_TOKEN }} 2>&1
+
+      - name: "Log in to GHCR"
+        run: |-
+          docker login -u ${{ secrets.GHCR_USERNAME }} -p ${{ secrets.GHCR_TOKEN }} ghcr.io 2>&1
+
+      - name: "Create and push manifests"
+        run: |-
+          CLEAN_VERSION="${{ env.JELLYFIN_VERSION }}"
+          HUB="jellyfin/jellyfin"
+          GHCR="ghcr.io/jellyfin/jellyfin"
+          HUB_SOURCES="${HUB}:${CLEAN_VERSION}-amd64 ${HUB}:${CLEAN_VERSION}-arm64"
+          GHCR_SOURCES="${GHCR}:${CLEAN_VERSION}-amd64 ${GHCR}:${CLEAN_VERSION}-arm64"
+
+          # Dated version manifest (the version string already contains the date for unstable)
+          docker manifest create ${HUB}:${CLEAN_VERSION} ${HUB_SOURCES}
+          docker manifest push --purge ${HUB}:${CLEAN_VERSION}
+          docker manifest create ${GHCR}:${CLEAN_VERSION} ${GHCR_SOURCES}
+          docker manifest push --purge ${GHCR}:${CLEAN_VERSION}
+          # unstable manifest
+          docker manifest create ${HUB}:unstable ${HUB_SOURCES}
+          docker manifest push --purge ${HUB}:unstable
+          docker manifest create ${GHCR}:unstable ${GHCR_SOURCES}
+          docker manifest push --purge ${GHCR}:unstable
+
+      - name: "Log out of registries"
+        if: always()
+        run: |-
+          docker logout
+          docker logout ghcr.io
 
   Debian:
     runs-on: ubuntu-24.04
