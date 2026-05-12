@@ -84,3 +84,38 @@ jobs:
           tag-selection: tagged
           image-tags: "unstable-* 20* !latest !rc*"
           skip-shas: ${{ steps.multi-arch-digests.outputs.multi-arch-digests }}
+
+  repo-list:
+    name: Fetch repository list 📋
+    runs-on: ubuntu-slim
+    if: ${{ always() }}
+    permissions:
+      contents: read
+    outputs:
+      repos: ${{ steps.list_repos.outputs.repos }}
+    steps:
+      - name: List repositories 📋
+        id: list_repos
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repos=$(gh repo list "${GITHUB_REPOSITORY_OWNER}" --json name --jq '.[].name' 2>&1)
+          repos_json=$(printf '%s' "$repos" | jq -R -s -c 'split("\n")[:-1]')
+          echo "repos=$repos_json" >> "$GITHUB_OUTPUT"
+
+  delete-workflow-logs:
+    name: Cleanup old workflow logs (${{ matrix.repo }}) 🧹
+    runs-on: ubuntu-slim
+    needs:
+      - repo-list
+    strategy:
+      matrix:
+        repo: ${{ fromJson(needs.repo-list.outputs.repos) }}
+    steps:
+      - name: Delete Workflow Runs
+        uses: Mattraks/delete-workflow-runs@v2.1.0
+        with:
+          token: ${{ secrets.JF_BOT_TOKEN }}
+          repository: ${{ github.repository_owner }}/${{ matrix.repo }}
+          retain_days: 90
+          keep_minimum_runs: 0
