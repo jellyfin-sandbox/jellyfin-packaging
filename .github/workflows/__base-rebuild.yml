@@ -1,0 +1,78 @@
+name: Build base image 💿
+
+on:
+  workflow_call:
+
+env:
+  DEBIAN_BASE_IMAGE: debian:trixie-slim
+
+jobs:
+  check_base:
+    name: Check if base image has been updated 🐳🔍
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.inspect.outputs.updated }}
+      upstream_digest: ${{ steps.inspect.outputs.upstream_digest }}
+      base_image: ${{ env.DEBIAN_BASE_IMAGE }}
+    steps:
+      - name: Install tools 🛠️
+        run: |
+          sudo apt update
+          sudo apt install -y skopeo jq ca-certificates
+        # If target image doesn't exist, or if its BASE_MANIFEST_DIGEST label doesn't match the current upstream manifest digest,
+        # then we consider the base image "updated" and trigger a build.
+      - name: Inspect images 🔍
+        id: inspect
+        run: |
+          set -euo pipefail
+          base_image="${DEBIAN_BASE_IMAGE}"
+          upstream_manifest_digest=$(
+            skopeo inspect \
+              --format '{{.Digest}}' \
+              docker://"$base_image" 2>/dev/null || true
+          )
+          if [ -z "$upstream_manifest_digest" ]; then
+            echo "upstream_digest=" >> $GITHUB_OUTPUT
+            echo "updated=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          target_image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/debian:stable"
+          target_config=$(
+            skopeo inspect \
+              --config \
+              docker://"$target_image" 2>/dev/null || true
+          )
+          if [ -z "$target_config" ]; then
+            echo "updated=true" >> $GITHUB_OUTPUT
+          else
+            target_base_label=$(echo "$target_config" | jq -r '.config.Labels["BASE_MANIFEST_DIGEST"] // empty')
+            if [ "$target_base_label" != "$upstream_manifest_digest" ]; then
+              echo "updated=true" >> $GITHUB_OUTPUT
+            else
+              echo "updated=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+          echo "upstream_digest=$upstream_manifest_digest" >> $GITHUB_OUTPUT
+
+  # Builds the base image used for the other images. The check helps us ensure that
+  # the latest vulnerabilities are always patched in a timely manner.
+  build:
+    name: Build base image 🐳🏗️
+    if: ${{ fromJson(needs.check_base.outputs.updated) }}
+    needs:
+      - check_base
+    uses: ./.github/workflows/__package.yml
+    # Needed for attestation publication
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+      packages: write
+    with:
+      dockerfile: ./Dockerfile
+      registry_image: ${{ github.repository_owner }}/debian
+      is_prerelease: false
+      push: true
+      build-args: |
+        BASE_IMAGE=${{ needs.check_base.outputs.base_image }}
+        BASE_MANIFEST_DIGEST=${{ needs.check_base.outputs.upstream_digest }}

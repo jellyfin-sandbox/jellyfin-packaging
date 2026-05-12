@@ -1,0 +1,86 @@
+name: Maintenance scheduled tasks 🛠️🕰️
+
+on:
+  schedule:
+    # Runs at 00:00 UTC on Mondays and Thursdays
+    - cron: 0 0 * * 1,4  
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  rebuild-base-image:
+    name: Rebuild base image if upstream has changed 🐳🔍
+    if: ${{ always() }}
+    uses: ./.github/workflows/__base-rebuild.yml
+
+  # Needs PAT with {read,write,delete}:packages
+  delete-old-images:
+    name: Cleanup ghcr.io registry 🧹
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Login to GitHub Container Registry 🔑
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.JF_BOT_TOKEN }}
+
+      - name: Fetch multi-platform package version SHAs
+        id: multi-arch-digests
+        env:
+          GH_TOKEN: ${{ secrets.JF_BOT_TOKEN }}
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER}"
+          # Detect whether owner is a user or organization to pick correct endpoint
+          actor_type=$(gh api "users/${owner}" --jq '.type' --silent 2>/dev/null || true)
+          if [ "$actor_type" = "Organization" ]; then
+            endpoint="orgs/${owner}/packages"
+          else
+            endpoint="users/${owner}/packages"
+          fi
+          # Query package names via gh; capture errors for debugging
+          resp=$(gh api "${endpoint}?package_type=container" --paginate --jq '.[].name' 2>&1)
+          mapfile -t packages <<<"$resp"
+
+          digests_list=()
+          for pkg in "${packages[@]}"; do
+            image="ghcr.io/${owner}/${pkg}"
+            # collect each digest individually to produce a flat comma-separated list
+            while read -r digest; do
+              [ -n "$digest" ] && digests_list+=("$digest")
+            done < <(docker manifest inspect "$image" 2>/dev/null | jq -r '.manifests[]?.digest')
+          done
+
+          if [ "${#digests_list[@]}" -gt 0 ]; then
+            IFS=,; multi_arch="${digests_list[*]}"
+          else
+            multi_arch=""
+          fi
+          echo "$multi_arch"
+          echo "multi-arch-digests=$multi_arch" >> "$GITHUB_OUTPUT"
+
+      - name: Delete untagged images 🧹
+        uses: snok/container-retention-policy@main
+        with:
+          account: ${{ github.repository_owner }}
+          token: ${{ secrets.JF_BOT_TOKEN }}
+          cut-off: 1s
+          image-names: "*"
+          tag-selection: untagged
+          skip-shas: ${{ steps.multi-arch-digests.outputs.multi-arch-digests }}
+
+      - name: Delete old tags 🧹
+        uses: snok/container-retention-policy@main
+        with:
+          account: ${{ github.repository_owner }}
+          token: ${{ secrets.JF_BOT_TOKEN }}
+          cut-off: 3months
+          image-names: "*"
+          tag-selection: tagged
+          image-tags: "unstable-* 20* !latest !rc*"
+          skip-shas: ${{ steps.multi-arch-digests.outputs.multi-arch-digests }}
