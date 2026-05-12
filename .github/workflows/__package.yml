@@ -81,11 +81,11 @@ jobs:
           
           # Stable release: No commit, is_prerelease=false
           if [[ -z "$INPUT_COMMIT" ]] && [[ "$INPUT_IS_PRERELEASE" == "false" ]]; then
-            TG+="${REGISTRY_IMAGE}:latest"$'\n'
-            TG+="${REGISTRY_IMAGE}:${RELEASE_TAG}"$'\n'
-            if [[ -n "$INPUT_TAG_NAME" ]]; then
-              TG+="${REGISTRY_IMAGE}:${RELEASE_TAG}.${INPUT_TAG_NAME}"$'\n'
-            fi
+            # TG+="${REGISTRY_IMAGE}:latest"$'\n'
+            # TG+="${REGISTRY_IMAGE}:${RELEASE_TAG}"$'\n'
+            #if [[ -n "$INPUT_TAG_NAME" ]]; then
+            #  TG+="${REGISTRY_IMAGE}:${RELEASE_TAG}.${INPUT_TAG_NAME}"$'\n'
+            #fi
             TG+="ghcr.io/${REGISTRY_IMAGE}:latest"$'\n'
             TG+="ghcr.io/${REGISTRY_IMAGE}:${RELEASE_TAG}"$'\n'
             if [[ -n "$INPUT_TAG_NAME" ]]; then
@@ -95,10 +95,10 @@ jobs:
           
           # Stable-rc release: No commit, is_prerelease=true
           if [[ -z "$INPUT_COMMIT" ]] && [[ "$INPUT_IS_PRERELEASE" == "true" ]]; then
-            TG+="${REGISTRY_IMAGE}:${PRERELEASE_TAG}"$'\n'
-            if [[ -n "$INPUT_TAG_NAME" ]]; then
-              TG+="${REGISTRY_IMAGE}:${PRERELEASE_TAG}.${INPUT_TAG_NAME}"$'\n'
-            fi
+            # TG+="${REGISTRY_IMAGE}:${PRERELEASE_TAG}"$'\n'
+            #if [[ -n "$INPUT_TAG_NAME" ]]; then
+              # TG+="${REGISTRY_IMAGE}:${PRERELEASE_TAG}.${INPUT_TAG_NAME}"$'\n'
+            #fi
             TG+="ghcr.io/${REGISTRY_IMAGE}:${PRERELEASE_TAG}"$'\n'
             if [[ -n "$INPUT_TAG_NAME" ]]; then
               TG+="ghcr.io/${REGISTRY_IMAGE}:${PRERELEASE_TAG}.${INPUT_TAG_NAME}"$'\n'
@@ -107,8 +107,8 @@ jobs:
           
           # Unstable release: Has commit hash
           if [[ -n "$INPUT_COMMIT" ]]; then
-            TG+="${REGISTRY_IMAGE}:${COMMIT_TAG}"$'\n'
-            TG+="${REGISTRY_IMAGE}:${COMMIT_TAG}.${STEP_DATE}.${STEP_SHA}"$'\n'
+            # TG+="${REGISTRY_IMAGE}:${COMMIT_TAG}"$'\n'
+            # TG+="${REGISTRY_IMAGE}:${COMMIT_TAG}.${STEP_DATE}.${STEP_SHA}"$'\n'
             TG+="ghcr.io/${REGISTRY_IMAGE}:${COMMIT_TAG}"$'\n'
             TG+="ghcr.io/${REGISTRY_IMAGE}:${COMMIT_TAG}.${STEP_DATE}.${STEP_SHA}"$'\n'
           fi
@@ -238,11 +238,11 @@ jobs:
           cleanup: false
           version: latest
 
-      - name: Login to Docker Hub 🔑
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Login to Docker Hub 🔑
+      #   uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GitHub Container Registry 🔑
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
